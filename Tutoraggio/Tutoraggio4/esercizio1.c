@@ -13,3 +13,6 @@ accomuna tutti i threads di un determinato
 processo.
 */
 
+void main (int argc, char *argv[]){
+    
+}
