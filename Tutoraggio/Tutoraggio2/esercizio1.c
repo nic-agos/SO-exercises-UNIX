@@ -17,10 +17,13 @@ allocato sullo stack.*/
 int main(){
     char *buff;
     int len;
+    
     printf("inserire una stringa: ");
     scanf("%m[^\n]", &buff);
+    
     len = strlen(buff);
     printf("%d\n", len);
+    
     char buff2[len];
     strcpy(buff2, buff);
     free(buff);
