@@ -33,7 +33,7 @@ void main (int argc, char *argv[]){
         scanf("%s[^\n]", paths[i]);
         printf("Ho letto il path: %s\n", paths[i]);
     }
-
+    
     for (int i = 0; i <MAX_PATHS; i++){
         child = fork();
         if(child == -1){
@@ -41,7 +41,7 @@ void main (int argc, char *argv[]){
         }else{
             forked = forked +1;
         }
-        if (child = 0){
+        if (child == 0){
             printf("sono nel processo child\n");
             execlp("ls", "ls", paths[i], NULL);
             exit(0);
@@ -50,6 +50,7 @@ void main (int argc, char *argv[]){
 
     for (int i = 0; i < forked; i++){
         wait(&status);
+        printf("Codice di uscita: %d\n", status);
     }
 
 

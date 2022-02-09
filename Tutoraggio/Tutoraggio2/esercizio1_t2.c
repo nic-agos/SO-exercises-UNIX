@@ -22,7 +22,7 @@ int main(){
     scanf("%m[^\n]", &buff);
     
     len = strlen(buff);
-    printf("%d\n", len);
+    printf("lunghezza stringa: %d\n", len);
     
     char buff2[len];
     strcpy(buff2, buff);
