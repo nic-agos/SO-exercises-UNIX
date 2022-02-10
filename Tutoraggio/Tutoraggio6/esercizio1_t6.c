@@ -12,3 +12,6 @@ file allocato su dispositivo secondo tale schema di
 indicizzazione.
 */
 
+int main(int argc, char *argv[]){
+    
+}
