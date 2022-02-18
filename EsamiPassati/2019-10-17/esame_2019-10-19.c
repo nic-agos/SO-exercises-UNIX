@@ -33,7 +33,7 @@ non piu' del 5% della capacita' di lavoro della CPU.
 #include <stdlib.h>
 #include <string.h>
 
-int num_threads;
+int num_processes;
 
 char **files; /*array di puntatori a stringhe per contenere i nomi dei files che verranno passati in input al main*/
 char **buffers; /*array di puntatori a stringhe dove memorizzare temporaneamente le stringhe da passare ad ogni thread*/
@@ -97,8 +97,8 @@ void printer(int dummy){
     char *s;
     int ret;
 
-    for(i = 0; i<num_threads; i++){
-        source_files[i] = fopen(files[i], "r");
+    for(i = 0; i<num_processes; i++){
+        source_files[i] = fopen(files[i], "r+");
         if(source_files[i] == NULL){
             printf("Signal handler - unable to open file %s\n", source_files[i]);
             exit(EXIT_FAILURE);
@@ -134,7 +134,7 @@ void printer(int dummy){
         /*libero la variabile s*/
         free(s);
 
-        i = (i+1)%num_threads;
+        i = (i+1)%num_processes;
     }
 
 }
@@ -153,10 +153,10 @@ int main(int argc, char **argv){
 
     files = argv + 1; /*per evitare in inserire argv[0] (nome dell'eseguibile) nell'array di stringhe */ 
 
-    num_threads = argc - 1;
+    num_processes = argc - 1;
 
     /*alloco lo spazio necessario a contenere un buffer per ogni thread da attivare*/
-    buffers = (char**)malloc(sizeof(char*)*num_threads);
+    buffers = (char**)malloc(sizeof(char*)*num_processes);
 
     if(buffers == NULL){
         printf("Buffer pointers allocation failure\n");
@@ -164,7 +164,7 @@ int main(int argc, char **argv){
     }
 
     /*alloco spazio per contenere i puntatori agli stream aperti su file*/
-    source_files = (FILE **)malloc(sizeof(FILE *)*num_threads);
+    source_files = (FILE **)malloc(sizeof(FILE *)*num_processes);
 
     if(source_files == NULL){
         printf("file pointers allocation failure\n");
@@ -172,8 +172,8 @@ int main(int argc, char **argv){
     }
 
     /*alloco spazio per contenere i puntatori agli identificatori dei mutex*/
-    ready = malloc(num_threads * sizeof(pthread_mutex_t));
-    done = malloc(num_threads * sizeof(pthread_mutex_t));
+    ready = malloc(num_processes * sizeof(pthread_mutex_t));
+    done = malloc(num_processes * sizeof(pthread_mutex_t));
 
     if (ready == NULL || done == NULL){
         printf("Mutex array allocation failure\n");
@@ -181,7 +181,7 @@ int main(int argc, char **argv){
     }
 
     /*Associo i mutex all'i-esimo slot di ready e done ed eseguo il lock di tutty i mutex Ready*/
-    for (i = 0; i < num_threads; i++){
+    for (i = 0; i < num_processes; i++){
         if(pthread_mutex_init(ready+i, NULL) != 0){
             printf("Ready mutex initialization failure\n");
             exit(EXIT_FAILURE);
@@ -197,7 +197,7 @@ int main(int argc, char **argv){
     }
 
     /*genero N thread*/
-    for (i = 0; i < num_threads; i++){
+    for (i = 0; i < num_processes; i++){
         ret = pthread_create(&tid, NULL, thread_function, (void *)i);
         if(ret != 0){
             printf("Unable to spawn thread n. %d", i);
@@ -244,7 +244,7 @@ redo_2:
             printf("Main thread - Unable to unlock mutex\n");
             exit(EXIT_FAILURE);
         }
-        i = (i+1)%num_threads;
+        i = (i+1)%num_processes;
     }
 
     return 0;

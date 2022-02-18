@@ -42,7 +42,7 @@ non piu' del 5% della capacita' di lavoro della CPU.
 #include <string.h>
 
 char *file_name;
-int num_threads;
+int num_processes;
 FILE *output_file;
 char **strings;
 char buff[4096];
@@ -114,7 +114,7 @@ int main(int argc, char **argv){
 
     file_name = argv[1];
 
-    num_threads = argc - 2;
+    num_processes = argc - 2;
 
     /*invoco l'apertura del file di output in scrittura, se non presente verrà creato e se presente viene troncato*/
     output_file = fopen(file_name, "w+");
@@ -125,15 +125,15 @@ int main(int argc, char **argv){
     }
 
     /*alloco lo spazio necessario a contentere i puntatori ai semafori*/
-    write_sem = malloc(sizeof(sem_t)*num_threads);
-    read_sem = malloc(sizeof(sem_t)*num_threads);
+    write_sem = malloc(sizeof(sem_t)*num_processes);
+    read_sem = malloc(sizeof(sem_t)*num_processes);
 
     if(write_sem == NULL || read_sem == NULL){
         printf("Unable to allocate semaphores array \n");
         exit(EXIT_FAILURE);
     }
 
-    for(i = 0; i < num_threads; i++){
+    for(i = 0; i < num_processes; i++){
 
         /*inizializzo i semafori Read con valore 0 e l'opzione di condivisione*/
         if(sem_init(&write_sem[i], 0, 0) != 0){
@@ -161,7 +161,7 @@ int main(int argc, char **argv){
     }
 
     /*creo gli N threads*/
-    for(i=0; i< num_threads; i++){
+    for(i=0; i< num_processes; i++){
         if(pthread_create(&pid, NULL, thread_function, (void *)i) != 0){
             printf("Unable to spawn threads\n");
             exit(EXIT_FAILURE);
@@ -183,7 +183,7 @@ int main(int argc, char **argv){
     while (1)
     {
         /*attendo che tutti i thread siano pronti a leggere*/
-        for(i = 0; i < num_threads; i++){
+        for(i = 0; i < num_processes; i++){
 redo1:  
             
             if(sem_wait(&read_sem[i]) != 0){
@@ -207,7 +207,7 @@ redo1:
         while(scanf("%s", buff) <= 0);
 
         /*segnalo a tutti i thred la possibilità di lavorare*/
-        for(i = 0; i < num_threads; i++){
+        for(i = 0; i < num_processes; i++){
 redo2:
             if(sem_post(&write_sem[i]) != 0){
                 if(errno == EINTR){

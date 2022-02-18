@@ -39,7 +39,7 @@ dovra' utilizzare non piu' del 5% della capacita' di lavoro della CPU.
 #include <stdlib.h>
 #include <string.h>
 
-int num_threads;
+int num_processes;
 FILE *output_file;
 char **strings;
 pthread_mutex_t *ready;
@@ -59,7 +59,7 @@ void *thread_function(void *arg){
     int i, j;
 
     /*controllo quale thread sono in base all'indice*/
-    if(me < num_threads -1){
+    if(me < num_processes -1){
         printf("Thread %d started up - in charge of string: %s\n", me, strings[me]);
     }
     else{
@@ -86,7 +86,7 @@ void *thread_function(void *arg){
         printf("Thread %d got string %s\n", me, buffers[me]);
 
         /*controllo se sono l'output thread*/
-        if(me == num_threads - 1){
+        if(me == num_processes - 1){
             
             printf("Writing string \"%s\" on the output file\n", buffers[me]);
             /*scrivo sul file la stringa ottenuta dopo le N elaborazioni*/
@@ -148,7 +148,7 @@ int main(int argc, char **argv){
     }
 
     /*num_threads include nel conto anche il thread di output, quindi in totale N+1 threads*/
-    num_threads = argc;
+    num_processes = argc;
 
     /*copio in strings i parametri passati al main eccetto il primo (nome del programma*/
     strings = argv + 1;
@@ -163,8 +163,8 @@ int main(int argc, char **argv){
     }
 
     /*alloco spazio per i puntatori agli identificatori dei semafori*/
-    ready = malloc(sizeof(pthread_mutex_t)*num_threads);
-    done = malloc(sizeof(pthread_mutex_t)*num_threads);
+    ready = malloc(sizeof(pthread_mutex_t)*num_processes);
+    done = malloc(sizeof(pthread_mutex_t)*num_processes);
 
     if(ready == NULL || done == NULL){
         printf("unable to allocate mutex array\n");
@@ -172,15 +172,14 @@ int main(int argc, char **argv){
     }
 
     /*alloco spazio per i buffers che conterranno le stringhe durante l'elaborazione*/
-    buffers = (char**)malloc(sizeof(char*)*num_threads);
+    buffers = (char**)malloc(sizeof(char*)*num_processes);
 
     if(buffers == NULL){
         printf("Unable to allocate buffers\n");
         exit(EXIT_FAILURE);
     }
 
-    printf("qui\n");
-    for(i=0; i<num_threads; i++){
+    for(i=0; i<num_processes; i++){
 
         /*inizializzo l'array di mutex Ready*/
         if(pthread_mutex_init(ready+i, NULL) != 0){
@@ -202,7 +201,7 @@ int main(int argc, char **argv){
     }
 
     /*genero gli N+1 thread*/
-    for(i = 0; i < num_threads; i++){
+    for(i = 0; i < num_processes; i++){
 
         ret = pthread_create(&tid, NULL, thread_function, (void*)i);
 
