@@ -165,7 +165,6 @@ void main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-
         segment = shared_memory[i];
 
         fd = open(argv[i+1], O_RDONLY);

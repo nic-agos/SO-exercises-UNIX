@@ -28,9 +28,9 @@ immesse da standard-input e memorizzate nei file destinazione.
 
 #define MAX_SIZE 128
 
-int num_threads;
+int num_processes;
 char **files_name;
-int ready;
+int sem;
 int done;
 char buff[128];
 
@@ -72,7 +72,7 @@ redo1:
 
 redo2:  
         op.sem_op = 1;
-        if(semop(ready, &op, 1) == -1){
+        if(semop(sem, &op, 1) == -1){
             if(errno == EINTR){
                 goto redo2;
             }
@@ -88,7 +88,7 @@ void handler(){
 
     char cmd[128];
 
-    sprintf(cmd, "cat %s", files_name[0]);
+    sprintf(cmd, "cat %s\n", files_name[0]);
     system(cmd);
 
 }
@@ -105,7 +105,7 @@ void main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
-    num_threads = argc-1;
+    num_processes = argc-1;
 
     files_name = argv+1;
 
@@ -113,23 +113,23 @@ void main(int argc, char **argv){
     signal(SIGINT, handler);
 
     /*alloco l'array semaforico Ready*/
-    ready = semget(IPC_PRIVATE, num_threads, IPC_CREAT | 0666);
+    sem = semget(IPC_PRIVATE, num_processes, IPC_CREAT | 0666);
 
-    if(ready == -1){
+    if(sem == -1){
         printf("Unable to initialize Ready semaphore\n");
         exit(EXIT_FAILURE);
     }
 
     /*inizializzo a 1 tutti i semafori Ready*/
-    for(i = 0; i < num_threads; i++){
-        if(semctl(ready, i, SETVAL, 1) == -1){
+    for(i = 0; i < num_processes; i++){
+        if(semctl(sem, i, SETVAL, 1) == -1){
             printf("Unable to initialize Ready semaphores\n");
             exit(EXIT_FAILURE);
         }
     }
 
     /*alloco l'array semaforico Done*/
-    done = semget(IPC_PRIVATE, num_threads, IPC_CREAT | 0666);
+    done = semget(IPC_PRIVATE, num_processes, IPC_CREAT | 0666);
 
     if(done == -1){
         printf("Unable to initialize Done semaphore\n");
@@ -137,14 +137,14 @@ void main(int argc, char **argv){
     }
 
     /*inizializzo a 0 tutti i semafori Done*/
-    for(i = 0; i < num_threads; i++){
+    for(i = 0; i < num_processes; i++){
         if(semctl(done, i, SETVAL, 0) == -1){
             printf("Unable to initialize Done semaphores\n");
             exit(EXIT_FAILURE);
         }
     }
 
-    for(i = 0; i < num_threads; i++){
+    for(i = 0; i < num_processes; i++){
         if(pthread_create(&tid, NULL, thread_function, (void *)i) != 0){
             printf("Unable to spawn threads\n");
             exit(EXIT_FAILURE);
@@ -155,12 +155,12 @@ void main(int argc, char **argv){
 
     while(1){
 
-        for(i=0; i<num_threads; i++){
+        for(i=0; i<num_processes; i++){
             op.sem_op = -1;
 redo1:      
             /*attendo che tutti i threads siano ready*/
             op.sem_num = i;
-            if(semop(ready, &op, 1) == -1){
+            if(semop(sem, &op, 1) == -1){
                 if(errno == EINTR){
                     goto redo1;
                 }
@@ -176,7 +176,7 @@ read_again:
             printf("Unable to get string from terminal\n");
             exit(EXIT_FAILURE);
         }
-        for (i = 0; i<num_threads; i++){
+        for (i = 0; i<num_processes; i++){
             op.sem_op = 1;
             op.sem_num = i;
 redo2:

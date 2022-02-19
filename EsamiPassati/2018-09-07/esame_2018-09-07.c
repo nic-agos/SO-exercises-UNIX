@@ -41,7 +41,7 @@ non piu' del 5% della capacita' di lavoro della CPU.
 #define MAX_LENGHT 4096
 
 FILE *output_file;
-int ready, done;
+int sem, done;
 char **shared_memory;
 pid_t child;
 long num_threads;
@@ -80,7 +80,7 @@ oper1:
 
 oper2:
         oper.sem_op = 1;
-        ret = semop(ready, &oper, 1);
+        ret = semop(sem, &oper, 1);
 
         if (ret == -1 && errno != EINTR){
 			printf("Unable to lock Done semaphore in child thread %d", me);
@@ -111,7 +111,7 @@ void *parent_thread(void *arg){
 oper1:
         /*tento di ottenere il lock sul semaforo ready per capire 
           se posso leggere una nuova string da stdint*/
-        ret = semop(ready, &oper, 1);
+        ret = semop(sem, &oper, 1);
 
         if (ret == -1 && errno != EINTR){
 			printf("Unable to lock Ready semaphore in parent thread %d", me);
@@ -209,15 +209,15 @@ int main(int argc, char **argv){
     }
 
     /*istanzio l'array semaforico Ready */
-    ready = semget(IPC_PRIVATE, num_threads, IPC_CREAT | 0666);
-    if(ready == -1){
+    sem = semget(IPC_PRIVATE, num_threads, IPC_CREAT | 0666);
+    if(sem == -1){
         printf("Unable to initialize ready semaphores\n");
         exit(EXIT_FAILURE);
     }   
 
     /*inizializzo i semafori Ready a 1*/
     for(i = 0; i < num_threads; i++){
-        ret = semctl(ready, i, SETVAL, 1);
+        ret = semctl(sem, i, SETVAL, 1);
         if(ret == -1){
             printf("Unable to set Ready semaphores\n");
         }
