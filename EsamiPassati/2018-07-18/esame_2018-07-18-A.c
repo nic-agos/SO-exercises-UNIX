@@ -46,7 +46,7 @@ void thread_function(){
 
     struct sembuf oper;
 
-    file = fdopen(fd, "r+");
+    file = fdopen(fd, "r");
 
     if(file == NULL){
         printf("Unable to open file in child process\n");
@@ -77,9 +77,14 @@ void handler(int signo){
 
     char *string;
 
+    /*leggo in ordine tutte le porzioni di memoria condivisa*/
     for(int i = 0; i < num_processes; i++){
+
         string = shared_memory[i];
+
+        /*eseguo un ciclo while finchè non trovo il terminatore del file*/
         while(strcmp(string, "\0") != 0){
+            
             printf("%s\n", string);
             string += strlen(string) + 1;
         }
@@ -110,7 +115,7 @@ void main(int argc, char **argv)
         fd = open(argv[i+1], O_RDONLY);
         if (fd == -1)
         {
-            printf("Unable to open file %s\n", argv[i]);
+            printf("Unable to open file %s\n", argv[i+1]);
             exit(EXIT_FAILURE);
         }
     }
@@ -152,7 +157,7 @@ void main(int argc, char **argv)
 
     for (i = 0; i < num_processes; i++)
     {   
-        printf("qui\n");
+
         shared_memory[i] = mmap(NULL, MAX_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0);
         if (shared_memory[i] == NULL)
         {
@@ -160,7 +165,6 @@ void main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        printf("qui\n");
 
         segment = shared_memory[i];
 
@@ -173,6 +177,7 @@ void main(int argc, char **argv)
         }
 
         if(ret == 0){
+            /*sono nel processo figlio*/
             /*ignoro esplicitamente il segnale SIGINT il quale deve essere a carico del solo processo main*/
             signal(SIGINT, SIG_IGN);
             thread_function();

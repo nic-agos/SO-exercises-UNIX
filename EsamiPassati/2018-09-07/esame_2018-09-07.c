@@ -51,7 +51,6 @@ void *child_thread(void *arg){
     
     long me = (long)arg;
     int ret;
-
     struct sembuf oper;
 
     printf("I'm the child thread %d\n", me);
@@ -110,7 +109,7 @@ void *parent_thread(void *arg){
         oper.sem_op = -1;
 
 oper1:
-        /*tento di ottenere il lock sul semsforo ready per capire 
+        /*tento di ottenere il lock sul semaforo ready per capire 
           se posso leggere una nuova string da stdint*/
         ret = semop(ready, &oper, 1);
 
@@ -134,7 +133,7 @@ oper2:
 
 oper3:
         ret = semop(done, &oper, 1);
-        if(ret == EOF && errno != EINTR){
+        if(ret == -1 && errno != EINTR){
             printf("Unable to unlock Done semaphore in parent thread %d\n", me);
             exit(EXIT_FAILURE);
         }
@@ -173,13 +172,8 @@ int main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
-    /*converto in intero la stringa indicante il numero dei threads*/
-    num_threads = atoi(argv[2]);
-
-    if(num_threads == 0){
-        printf("Insert a number for NumThreads\n");
-        exit(EXIT_FAILURE);
-    }
+    /*converto in long la stringa indicante il numero dei threads passata al main*/
+    num_threads = strtol(argv[2], NULL, 10);
 
     if(num_threads < 1){
         printf("NumThreads must be greater than 1");
@@ -254,7 +248,6 @@ int main(int argc, char **argv){
     }
     
     if(child == 0){
-        printf("I'm the child process\n");
 
         /*imposto la gestione del segnale SIGINT per il child process*/
         signal(SIGINT, child_handler);
