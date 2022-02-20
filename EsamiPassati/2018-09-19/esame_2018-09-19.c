@@ -35,14 +35,73 @@ non piu' del 5% della capacita' di lavoro della CPU.
 #include <stdlib.h>
 #include <string.h>
 
-char **paths;
-sem_t *ready;
-sem_t *done;
-int num_processes;
-char buff[5];
+/* !!!!!!! program has some bugs !!!!!!! */
+
+#include <unistd.h>
+#include <errno.h>
+#include <signal.h>
+#include <pthread.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/mman.h>
+#include <sys/sem.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define NUM_CHARS 5
+
+sem_t *sem;
+int num_threads;
+char buff[NUM_CHARS];
+char oth_buff[NUM_CHARS];
 FILE **target_files;
+FILE **recostruction_files;
 
 void printer(){
+
+    int res;
+    int turn; 
+    int i;
+
+    printf("received CTRL+C - reconstructing the original stream\n");
+    fflush(stdout);
+
+    for(i= 1; i<num_threads; i++){
+        if(fseek(recostruction_files[i], 0, SEEK_SET) == -1){
+            printf("Cannot position at the begin of file\n");
+            fflush(stdout);
+        }
+    }
+
+    turn = 0;
+
+    while(1){
+        res = 0;
+        fscanf(recostruction_files[turn+1], "%s", &oth_buff);
+        if(res == EOF){
+            printf("Unable to read from file\n");
+            fflush(stdout);
+            exit(EXIT_FAILURE);
+        }
+
+        res = strlen(oth_buff);
+
+        for(i =0; i<res; i++){
+            putchar(oth_buff[i]);
+        }
+        fflush(stdout);
+
+        if(res < NUM_CHARS){
+            printf("\n stream reconstruction done\n");
+			fflush(stdout);
+            exit(0);
+        }
+
+        turn = (turn +1)%num_threads;
+    }
 
 }
 
@@ -51,21 +110,23 @@ void *thread_function(void *arg){
     long int me = (long int)arg;
     int ret;
 
-    printf("I'm the thread %d in charge of file %s\n", me, paths[me]);
+    printf("I'm the thread %d, just spawn \n", me);
 
     while(1){
 step1:
-        ret = sem_wait(&ready[me]);
+        ret = sem_wait(&sem[me]);
         if(ret == -1){
             if(errno == EINTR){
                 goto step1;
             }
             printf("Unable to wait Done semaphore for thread %d\n", me);
+            fflush(stdout);
+            exit(EXIT_FAILURE);
         }
-
-        /*scrivo i dati sul file*/
-        if(fprintf(target_files[me], "%s\n", buff)<0){
-            printf("Unable to write on the file %s\n", paths[me]);
+        
+        /*scrivo esattamente 5 bytes sul file*/
+        if(fprintf(target_files[me], "%s", buff)<0){
+            printf("Unable to write on the file\n");
             exit(EXIT_FAILURE);
         }
 
@@ -73,13 +134,16 @@ step1:
         fflush(target_files[me]);
 
 step2: 
-        ret = sem_post(&done[me]);
+        ret = sem_post(&sem[0]);
         if(ret != 0){
             if(errno == EINTR){
                 goto step2;
             }
             printf("Unable to signal ready semaphore for thread %d\n", me);
         }
+
+        printf("Thread %d, just write %d more bytes on file\n", me, NUM_CHARS);
+        fflush(stdout);
 
     }
 }
@@ -92,60 +156,68 @@ int main(int argc, char **argv){
     pthread_t pid;
     sigset_t set;
     struct sigaction sa;
+    int turn;
 
     if(argc < 2){
-        printf("Incorrect number of parameters\n");
+        printf("usage: prog file_name1 [file_name2] ... [file_nameN]\n");
         exit(EXIT_FAILURE);
     }
 
-    /*salvo nella variabile globale paths i percorsi dei file*/
-    paths = argv + 1;
+    num_threads = argc - 1;
 
-    num_processes = argc - 1;
+    /*alloco lo spazio necessario a mantenere i puntatori ai file*/
+    target_files = (FILE**)malloc(sizeof(FILE*)*(argc));
+    if(target_files == NULL){
+        printf("Unable to allocate space for stream's pointers\n");
+        exit(EXIT_FAILURE);
+    }
 
-    ready = malloc(sizeof(sem_t)*num_processes);
-    done = malloc(sizeof(sem_t)*num_processes);
+     /*alloco lo spazio necessario a mantenere i puntatori ai file per la ricostruzione*/
+    recostruction_files = (FILE**)malloc(sizeof(FILE*)*(argc));
+    if(recostruction_files == NULL){
+        printf("Unable to allocate space for stream's pointers\n");
+        exit(EXIT_FAILURE);
+    }  
 
-    if(ready == NULL || done == NULL){
+    target_files[0] = NULL;
+
+    /*creo i file destinazione*/
+    for(i = 1; i < argc; i++){
+
+        target_files[i] = fopen(argv[i], "w+");
+
+        recostruction_files[i] = fopen(argv[i], "r");
+
+        if(target_files[i] == NULL || recostruction_files[i] == NULL){
+            printf("Main thread - unable to create destination files\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    sem = malloc(sizeof(sem_t)*(argc));
+
+    if(sem == NULL){
         printf("Unable to allocate space for semaphores\n");
         exit(EXIT_FAILURE);
     }
 
-    /*alloco lo spazio necessario a mantenere i puntatori ai file*/
-    target_files = (FILE**)malloc(sizeof(FILE*)*num_processes);
-    if(target_files == NULL){
-        printf("Unable to allocate space for stream's pointers\n");
+    if(sem_init(&sem[0], 0, 1) == -1){
+        printf("Unable to initialize semaphores\n");
         exit(EXIT_FAILURE);
-    }    
-
-    /*creo i file destinazione*/
-    for(i = 0; i < num_processes; i++){
-
-        target_files[i] = fopen(paths[i], "w+");
-
-        if(target_files[i] == NULL){
-            printf("Unable to create files\n");
-            exit(EXIT_FAILURE);
-        }
     }
 
     /*inizializzo i semafori*/
-    for(i = 0; i < num_processes; i++){
+    for(i = 1; i < argc; i++){
         
-        if(sem_init(&ready[i], 0, 1) == -1){
-            printf("Unable to initialize Ready semaphores\n");
-            exit(EXIT_FAILURE);
-        }
-
-        if(sem_init(&done[i], 0, 0) == -1){
-            printf("Unable to set Done sempahores\n");
+        if(sem_init(&sem[i], 0, 0) == -1){
+            printf("Unable to initialize semaphores\n");
             exit(EXIT_FAILURE);
         }
 
     }
 
     /*creo gli N threads*/
-    for(i = 0; i < num_processes; i++){
+    for(i = 1; i < argc; i++){
 
         ret = pthread_create(&pid, NULL, thread_function, (void*)i);
 
@@ -167,17 +239,17 @@ int main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
-    i = 0;
+    turn = 0;
 
     while(1){
 redo1:
-        ret = sem_wait(&done[i]);
+        ret = sem_wait(&sem[0]);
 
         if(ret != 0){
             if(errno == EINTR){
                 goto redo1;
             }
-            printf("Unable to lock Ready semaphore of thread %d", i);
+            printf("Unable to lock Ready semaphore of thread %d", turn);
             exit(EXIT_FAILURE);
         }
 
@@ -186,17 +258,17 @@ redo1:
         }
 
 redo2:
-        ret = sem_post(&ready[i]);
+        ret = sem_post(&sem[turn+1]);
 
         if(ret != 0){
             if(errno == EINTR){
                 goto redo2;
             }
-            printf("Unable to signal Done semaphore of thread %d", i);
+            printf("Unable to signal Done semaphore of thread %d", turn);
             exit(EXIT_FAILURE);
         }
         /*implemento la logica di round-robin*/
-        i = (i+1)%num_processes;
+        turn = (turn+1)%num_threads;
     }
 
     return 0;
