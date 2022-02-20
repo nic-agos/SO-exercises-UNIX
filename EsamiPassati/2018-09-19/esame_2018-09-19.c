@@ -21,21 +21,8 @@ Qualora non vi sia immissione di input, l'applicazione dovra' utilizzare
 non piu' del 5% della capacita' di lavoro della CPU.
 */
 
-#include <unistd.h>
-#include <errno.h>
-#include <signal.h>
-#include <pthread.h>
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/mman.h>
-#include <sys/sem.h>
-#include <semaphore.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-/* !!!!!!! program has some bugs !!!!!!! */
+/* questa versione prevede che siano passati in input stringhe di non più di 5 caratteri alla volta*/
 
 #include <unistd.h>
 #include <errno.h>
@@ -66,7 +53,7 @@ void printer(){
     int turn; 
     int i;
 
-    printf("received CTRL+C - reconstructing the original stream\n");
+    printf("\nreceived CTRL+C - reconstructing the original stream\n");
     fflush(stdout);
 
     for(i= 1; i<num_threads; i++){
@@ -79,27 +66,19 @@ void printer(){
     turn = 0;
 
     while(1){
-        res = 0;
-        fscanf(recostruction_files[turn+1], "%s", &oth_buff);
+
+        res = fscanf(recostruction_files[turn+1], "%s", &oth_buff);
         if(res == EOF){
-            printf("Unable to read from file\n");
-            fflush(stdout);
-            exit(EXIT_FAILURE);
+            if(turn == num_threads){
+                printf("Recostruction done\n");
+                exit(EXIT_FAILURE);
+            }
+            goto next;
         }
 
-        res = strlen(oth_buff);
-
-        for(i =0; i<res; i++){
-            putchar(oth_buff[i]);
-        }
+        printf("%s ", oth_buff);
         fflush(stdout);
-
-        if(res < NUM_CHARS){
-            printf("\n stream reconstruction done\n");
-			fflush(stdout);
-            exit(0);
-        }
-
+next:
         turn = (turn +1)%num_threads;
     }
 
@@ -124,8 +103,10 @@ step1:
             exit(EXIT_FAILURE);
         }
         
-        /*scrivo esattamente 5 bytes sul file*/
-        if(fprintf(target_files[me], "%s", buff)<0){
+        printf("Child thread %d - reading string %s from buff\n", me, buff);
+
+        /*scrivo i dati del buffer sul file*/
+        if(fprintf(target_files[me], "%s\n", buff)<0){
             printf("Unable to write on the file\n");
             exit(EXIT_FAILURE);
         }
@@ -157,6 +138,7 @@ int main(int argc, char **argv){
     sigset_t set;
     struct sigaction sa;
     int turn;
+    char *string;
 
     if(argc < 2){
         printf("usage: prog file_name1 [file_name2] ... [file_nameN]\n");
@@ -253,8 +235,15 @@ redo1:
             exit(EXIT_FAILURE);
         }
 
-        for(j = 0; j < 5; j++){
-            buff[j] = getchar();
+        /*ottengo i dati in input e li salvo nel buffer*/
+        scanf("%ms", &string);
+        if(strlen(string) <= 5){
+            strcpy(buff, string);
+        }
+
+        else{
+            printf("You must insert string of max 5 char\n");
+            exit(EXIT_FAILURE);
         }
 
 redo2:

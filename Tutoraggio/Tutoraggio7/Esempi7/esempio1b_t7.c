@@ -16,7 +16,7 @@ static const char *filename = "file-to-reverse.txt";
  * e "write" che operano su un descrittore ottenuto all'atto dell'apertura del file.
  *
  * Iterativamente i puntatori all'interno del file dei set di bytes da invertire
- * vengono invcrementati e decrementati fino ad ottenere un file con il
+ * vengono incrementati e decrementati fino ad ottenere un file con il
  * contenuto originale completamente invertito.
  *
  * Inoltre, per ottenere un risultato corretto, il contenuto letto in dei buffer
