@@ -57,6 +57,8 @@ void printer(){
     fflush(stdout);
 
     for(i= 1; i<num_threads; i++){
+
+        /*muovo il file pointer all'inizio di ogni file */
         if(fseek(recostruction_files[i], 0, SEEK_SET) == -1){
             printf("Cannot position at the begin of file\n");
             fflush(stdout);
@@ -71,7 +73,7 @@ void printer(){
         if(res == EOF){
             if(turn == num_threads){
                 printf("Recostruction done\n");
-                exit(EXIT_FAILURE);
+                exit(EXIT_SUCCESS);
             }
             goto next;
         }
@@ -93,7 +95,9 @@ void *thread_function(void *arg){
 
     while(1){
 step1:
+        /*attendo che il processo main consegni dati per questo thread*/
         ret = sem_wait(&sem[me]);
+
         if(ret == -1){
             if(errno == EINTR){
                 goto step1;
@@ -115,7 +119,9 @@ step1:
         fflush(target_files[me]);
 
 step2: 
+        /*segnalo al processo main di aver completato l'elaborazione*/
         ret = sem_post(&sem[0]);
+
         if(ret != 0){
             if(errno == EINTR){
                 goto step2;
@@ -149,6 +155,7 @@ int main(int argc, char **argv){
 
     /*alloco lo spazio necessario a mantenere i puntatori ai file*/
     target_files = (FILE**)malloc(sizeof(FILE*)*(argc));
+
     if(target_files == NULL){
         printf("Unable to allocate space for stream's pointers\n");
         exit(EXIT_FAILURE);
@@ -156,6 +163,7 @@ int main(int argc, char **argv){
 
     /*alloco lo spazio necessario a mantenere i puntatori ai file per la ricostruzione*/
     recostruction_files = (FILE**)malloc(sizeof(FILE*)*(argc));
+
     if(recostruction_files == NULL){
         printf("Unable to allocate space for stream's pointers\n");
         exit(EXIT_FAILURE);
@@ -187,7 +195,7 @@ int main(int argc, char **argv){
     }
 
     /*inizializzo il primo seaforo a 1, il primo semaforo viene utilizzato per segnalare al 
-      main quando il thread che ha il turno ha terminato l'elaborazione. Ne viene usato uno per tutti i thread*/
+      main che il child thread avente il turno ha terminato l'elaborazione. Ne viene usato uno per tutti i thread*/
     if(sem_init(&sem[0], 0, 1) == -1){
         printf("Unable to initialize semaphores\n");
         exit(EXIT_FAILURE);
@@ -244,6 +252,7 @@ redo1:
 
         /*prelevo i dati in input e li scrivo nel buffer*/
         scanf("%ms", &string);
+
         if(strlen(string) <= 5){
             strcpy(buff, string);
         }
@@ -253,7 +262,7 @@ redo1:
         }
 
 redo2:
-        /*segnalo al thread successivo che può operare*/
+        /*segnalo al thread avente il turno che può operare*/
         ret = sem_post(&sem[turn+1]);
 
         if(ret != 0){

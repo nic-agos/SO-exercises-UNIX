@@ -46,7 +46,7 @@ void run(){
 
     printf("I'm the process %d, just started\n", me);
 
-    /*ignoro esplicitamente il segnale SIGINt che dovrà essere gestito solo dal processo padre*/
+    /*ignoro esplicitamente il segnale SIGINT che dovrà essere gestito solo dal processo padre*/
     signal(SIGINT, SIG_IGN);
 
     while(1){
@@ -55,7 +55,8 @@ redo1:
         op.sem_num = 1;
         op.sem_op = -1;
 
-        /*tento di eseguire una wait sul semaforo Ready, se riesco a prenderlo potrò inizare ad acquisire valori da stdin*/
+        /*tento di eseguire una wait sul semaforo Ready, se riesco a prenderlo allora il main thread 
+          avrà terminato la sua esecuzione e potrò inizare ad acquisire valori da stdin*/
         if(semop(ready, &op, 1) == -1){
             if(errno == EINTR){
                 goto redo1;
@@ -64,6 +65,7 @@ redo1:
             exit(EXIT_FAILURE);
         }
 
+        /*acquisisco da stdin un valore intero e lo scrivo sulla variabile condivisa*/
         ret = scanf("%d", values);
 
         if(ret == 0){
@@ -79,6 +81,7 @@ redo2:
         op.sem_num = 0;
         op.sem_op = 1;
 
+        /*eseguo una signal sul semaforo Done, per indicare al main thread che è stato acquisito un nuovo valore*/
         if(semop(ready, &op, 1) == -1){
             if(errno == EINTR){
                 goto redo2;
@@ -164,7 +167,7 @@ void main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
-    /*imposto la funzione di gestione per il segnale SIGINT*/
+    /*imposto la funzione di gestione per il segnale SIGINT del main thread*/
     signal(SIGINT, handler);   
 
     printf("Spawning %d processes\n", num_processes);
@@ -190,6 +193,8 @@ redo1:
         op.sem_num = 0;
         op.sem_op = -1;
 
+        /*attendo che il semaforo Done venga sbloccato da qualche thread, 
+          vorrà dire che è stato acquisito un nuovo intero da stdin*/
         if(semop(ready, &op, 1) == -1){
             if(errno == EINTR){
                 goto redo1;
@@ -217,6 +222,8 @@ redo3:
         op.sem_flg = 0;
         op.sem_num = 1;
         op.sem_op = 1;
+
+        /*segnalo ai thread di essere di nuovo prontfo per ricevere un nuovo valore*/
         if(semop(ready, &op, 1) == -1){
             if(errno == EINTR){
                 goto redo3;

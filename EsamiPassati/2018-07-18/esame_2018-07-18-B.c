@@ -43,6 +43,7 @@ void *thread_function(void *arg){
 
     printf("I'm the child thread %d in charge of file %s\n", me, files_name[me]);
 
+    /*apro il file a me assegnato*/
     output_file = fopen(files_name[me], "w+");
 
     if(output_file == NULL){

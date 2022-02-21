@@ -54,9 +54,8 @@ void *thread_function(void *arg){
 
 	printf("I'm thread %d, just spawning\n", me);
 
-	
-
 	while(1){
+
 		/*alloco spazio per il nuovo record*/
 		aux = malloc(sizeof(data));
 
@@ -69,6 +68,7 @@ redo1:
 		op.sem_num = me;
 		op.sem_op = -1;
 
+		/*aspetto di venire sbloccato dal thread main*/
 		if(semop(done_sem, &op, 1) == -1){
 			if(errno == EINTR){
 				goto redo1;
@@ -78,7 +78,11 @@ redo1:
 		}
 		/*aggiungo alla lista relativa al thread il nuovo elemento*/
 		aux->val = val;
+
+		/*il successore del nuovo nodo sarà l'elemento in testa alla lista*/
 		aux->next = lists[me].next;
+
+		/*l'elemento in testa nella lista sarà il nuovo nodo*/
 		lists[me].next = aux;
 
 		printf("New record for list %d has value = %d and next = %p\n", me, aux->val, aux->next);
@@ -88,6 +92,7 @@ redo2:
 		op.sem_num = me;
 		op.sem_op = 1;
 
+		/*segnalo al main thread di aver completato la mia computazione*/
 		if(semop(ready_sem, &op, 1) == -1){
 			if(errno == EINTR){
 				goto redo2;
@@ -106,7 +111,7 @@ void handler(int signo, siginfo_t *a, void *b){
 	int val;
 	data aux;
 	
-	printf("\n");
+	printf("\nReceived CTRL+C - data stored in lists are:\n");
 
 	for(i=0; i<num_threads; i++){
 		j=0;
@@ -145,7 +150,7 @@ void main(int argc, char **argv){
 		exit(EXIT_FAILURE);
 	}
 
-	/*alloco lo spazio necessario a contenere una lista per ogni thread*/
+	/*alloc un record per ogni lista, usato come record iniziale a cui collegarsi*/
 	lists = malloc(sizeof(data)*num_threads);
 
 	if(lists == NULL){
@@ -184,7 +189,7 @@ void main(int argc, char **argv){
 		exit(EXIT_FAILURE);
 	}
 
-	/*inizializzo a 0 tutti i semafori dell'array Ready*/
+	/*inizializzo a 0 tutti i semafori dell'array Done*/
 	for(i=0; i<num_threads; i++){
 		ret = semctl(done_sem, i, SETVAL, 0);
 		if(ret == -1){
@@ -228,6 +233,8 @@ redo1:
 		op.sem_flg = 0;
 		op.sem_num = i;
 		op.sem_op = -1;
+
+		/*attendo che l'i-esimo processo sia pronto ad eseguire*/
 		if(semop(ready_sem, &op, 1) == -1){
 			if(errno == EINTR){
 				goto redo1;
@@ -237,12 +244,14 @@ redo1:
 		}
 redo2:
 
+		/*prelevo da stdin il valore intero da inserire nel nuovo record*/
 		ret = scanf("%d", &val);
 		if(ret == EOF){
 			if(errno == EINTR){
 				goto redo2;
 			}
 			printf("Unable to get an integer from stdin\n");
+			exit(EXIT_FAILURE);
 		}
 
 redo3:
@@ -250,6 +259,7 @@ redo3:
 		op.sem_num = i;
 		op.sem_op = 1;
 
+		/*segnalo all'i-esimo thread che ho acquisito il valore e quindi può eseguire le sua computazione*/
 		if(semop(done_sem, &op, 1) == -1){
 			if(errno == EINTR){
 				goto redo3;
@@ -258,6 +268,7 @@ redo3:
 			exit(EXIT_FAILURE);
 		}
 
+		/*implemento la logica di gestione circolare*/
 		i = (i+1)%num_threads;
 	}
 

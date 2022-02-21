@@ -81,8 +81,9 @@ oper1:
         fflush(output_file);
 
 oper2:
-        /*segnalo di aver terminato la mia esecuzione*/
+        /*segnalo al relativo thread parent di aver terminato la mia esecuzione*/
         oper.sem_op = 1;
+
         ret = semop(ready, &oper, 1);
 
         if (ret == -1 && errno != EINTR){
@@ -125,6 +126,7 @@ oper1:
 oper2:
         /*inserisco la stringa prelevata da stdin nella i-esima entry del buffer condiviso*/
         ret = scanf("%s", shared_memory[me]);
+
         if(ret == EOF && errno != EINTR){
             printf("Unable to read from the terminal\n");
             exit(EXIT_FAILURE);
@@ -138,6 +140,7 @@ oper2:
 oper3:  
         /*segnalo al relativo thread figlio che ho consegnato dei dati per lui*/
         ret = semop(done, &oper, 1);
+
         if(ret == -1 && errno != EINTR){
             printf("Unable to unlock Done semaphore in parent thread %d\n", me);
             exit(EXIT_FAILURE);
@@ -215,14 +218,15 @@ int main(int argc, char **argv){
         }
     }
 
-    /*istanzio l'array semaforico Ready */
+    /*istanzio l'array semaforico da N elementi */
     ready = semget(IPC_PRIVATE, num_threads, IPC_CREAT | 0666);
+
     if(ready == -1){
-        printf("Unable to initialize ready semaphores\n");
+        printf("Unable to initialize Ready semaphores\n");
         exit(EXIT_FAILURE);
     }   
 
-    /*inizializzo tutti i semafori Ready a 1*/
+    /*inizializzo tutti i semafori a 1*/
     for(i = 0; i < num_threads; i++){
         ret = semctl(ready, i, SETVAL, 1);
         if(ret == -1){
@@ -232,6 +236,7 @@ int main(int argc, char **argv){
 
     /*istanzio l'array semaforico Done*/
     done = semget(IPC_PRIVATE, num_threads, IPC_CREAT | 0666);
+
     if(done == -1){
         printf("Unable to initialize Done semaphores\n");
         exit(EXIT_FAILURE);

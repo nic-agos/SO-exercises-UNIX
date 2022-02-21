@@ -73,7 +73,7 @@ void thread_function(){
 
 void handler(int signo){
 
-    printf("I'm the SIGINT handler\n");
+    printf("\nReceived CTRL+C - files content is:\n");
 
     char *string;
 
@@ -120,7 +120,9 @@ void main(int argc, char **argv)
         }
     }
 
+    /*alloco memoria sufficiente a contenere uno slot per ogni processo*/
     shared_memory = malloc(sizeof(void *)*num_processes);
+
     if(shared_memory == NULL){
         printf("Unable to allocate space for the shared memory\n");
         exit(EXIT_FAILURE);
@@ -149,27 +151,34 @@ void main(int argc, char **argv)
     sa.sa_flags = SA_SIGINFO;
     sa.sa_mask = set;
 
+    /*imposto il gestore del segnale SIGINT per il main process*/
     if(sigaction(SIGINT, &sa, NULL) == -1){
         printf("Unable to set SIGINT event handler\n");
         exit(EXIT_FAILURE);
 
     }
 
+    /*eseguo il mapping degli slot di memoria condivisa di tutti i processi */
     for (i = 0; i < num_processes; i++)
     {   
 
         shared_memory[i] = mmap(NULL, MAX_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+
         if (shared_memory[i] == NULL)
         {
             printf("Unable to allocate memory\n");
             exit(EXIT_FAILURE);
         }
 
+        /*ciclicamente mi salvo in segment la posizione dello slot di memoria dell'i-esimo processo*/
         segment = shared_memory[i];
 
+        /*apro in lettura l'i-esimo file sorgente*/
         fd = open(argv[i+1], O_RDONLY);
 
+        /*dato che il processo figlio eredita le informazioni sulle variabile del padre ognuno riceverà il gisuto fd e il giusto segmente*/
         ret = fork();
+
         if(ret == -1){
             printf("Unable to fork process\n");
             exit(EXIT_FAILURE);
@@ -177,6 +186,7 @@ void main(int argc, char **argv)
 
         if(ret == 0){
             /*sono nel processo figlio*/
+
             /*ignoro esplicitamente il segnale SIGINT il quale deve essere a carico del solo processo main*/
             signal(SIGINT, SIG_IGN);
             thread_function();
@@ -190,6 +200,9 @@ void main(int argc, char **argv)
     oper.sem_flg = 0;
 
 redo:
+
+    /*attendo che tutti i processi abbiamo terminato di scrivere su memoria 
+      condivisa il contenuto del file a loro assegnato*/
     if(semop(ready, &oper,1) == -1){
         if(errno == EINTR){
             goto redo;
@@ -197,6 +210,7 @@ redo:
         printf("Unable to wait childs\n");
         exit(EXIT_FAILURE);
     }
+
     printf("All childs terminates\n");
 
     while(1) pause();
