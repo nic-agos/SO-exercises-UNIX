@@ -34,7 +34,7 @@ consumare piu' del 5% della capacita' di lavoro della CPU.
 int num_processes;
 char *file_name;
 FILE *output_file;
-int sem;
+int ready;
 int done;
 int *values;
 
@@ -56,7 +56,7 @@ redo1:
         op.sem_op = -1;
 
         /*tento di eseguire una wait sul semaforo Ready, se riesco a prenderlo potrò inizare ad acquisire valori da stdin*/
-        if(semop(sem, &op, 1) == -1){
+        if(semop(ready, &op, 1) == -1){
             if(errno == EINTR){
                 goto redo1;
             }
@@ -79,7 +79,7 @@ redo2:
         op.sem_num = 0;
         op.sem_op = 1;
 
-        if(semop(sem, &op, 1) == -1){
+        if(semop(ready, &op, 1) == -1){
             if(errno == EINTR){
                 goto redo2;
             }
@@ -141,15 +141,15 @@ void main(int argc, char **argv){
     }
 
     /*invoco la creazione di un array di 2 semafori*/
-    sem = semget(key, 2, IPC_CREAT | 0666);
+    ready = semget(key, 2, IPC_CREAT | 0666);
 
-    if(sem == -1){
+    if(ready == -1){
         printf("Unable to initialize sempahores\n");
         exit(EXIT_FAILURE);
     }
 
     /*inizializzo il semaforo Done (in posizione 0) a 0*/
-    ret = semctl(sem, 0, SETVAL, 0);
+    ret = semctl(ready, 0, SETVAL, 0);
 
     if(ret == -1){
         printf("Unable to initialize first semaphore\n");
@@ -157,7 +157,7 @@ void main(int argc, char **argv){
     }
 
     /*inizializzo il semaforo Ready (in posizione 1) a 1*/
-    ret = semctl(sem, 1, SETVAL, 1);
+    ret = semctl(ready, 1, SETVAL, 1);
 
      if(ret == -1){
         printf("Unable to initialize second semaphore\n");
@@ -190,7 +190,7 @@ redo1:
         op.sem_num = 0;
         op.sem_op = -1;
 
-        if(semop(sem, &op, 1) == -1){
+        if(semop(ready, &op, 1) == -1){
             if(errno == EINTR){
                 goto redo1;
             }
@@ -217,7 +217,7 @@ redo3:
         op.sem_flg = 0;
         op.sem_num = 1;
         op.sem_op = 1;
-        if(semop(sem, &op, 1) == -1){
+        if(semop(ready, &op, 1) == -1){
             if(errno == EINTR){
                 goto redo3;
             }

@@ -154,7 +154,7 @@ int main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
-     /*alloco lo spazio necessario a mantenere i puntatori ai file per la ricostruzione*/
+    /*alloco lo spazio necessario a mantenere i puntatori ai file per la ricostruzione*/
     recostruction_files = (FILE**)malloc(sizeof(FILE*)*(argc));
     if(recostruction_files == NULL){
         printf("Unable to allocate space for stream's pointers\n");
@@ -166,8 +166,10 @@ int main(int argc, char **argv){
     /*creo i file destinazione*/
     for(i = 1; i < argc; i++){
 
+        /*apro il file in lettura e scrittura, se esiste già viene troncato altrimenti viene creato*/
         target_files[i] = fopen(argv[i], "w+");
 
+        /*apro uno stream di sola lettura sul file appena creato*/
         recostruction_files[i] = fopen(argv[i], "r");
 
         if(target_files[i] == NULL || recostruction_files[i] == NULL){
@@ -176,6 +178,7 @@ int main(int argc, char **argv){
         }
     }
 
+    /*alloco lo spazio necessario a contenere i puntatori ai semafori*/
     sem = malloc(sizeof(sem_t)*(argc));
 
     if(sem == NULL){
@@ -183,12 +186,14 @@ int main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
+    /*inizializzo il primo seaforo a 1, il primo semaforo viene utilizzato per segnalare al 
+      main quando il thread che ha il turno ha terminato l'elaborazione. Ne viene usato uno per tutti i thread*/
     if(sem_init(&sem[0], 0, 1) == -1){
         printf("Unable to initialize semaphores\n");
         exit(EXIT_FAILURE);
     }
 
-    /*inizializzo i semafori*/
+    /*inizializzo i restanti semafori a 0*/
     for(i = 1; i < argc; i++){
         
         if(sem_init(&sem[i], 0, 0) == -1){
@@ -216,6 +221,7 @@ int main(int argc, char **argv){
     sa.sa_handler = printer;
     sa.sa_mask = set;
 
+    /*imposto la funzione di handler per il segnale SIGINT*/
     if(sigaction(SIGINT, &sa, NULL) == -1){
         printf("Unable to set SIGINT handler for main thread\n");
         exit(EXIT_FAILURE);
@@ -224,7 +230,8 @@ int main(int argc, char **argv){
     turn = 0;
 
     while(1){
-redo1:
+redo1:  
+        /*aspetto che il thread che ha il turno in quel momento abbia terminato la sua esecuzione*/
         ret = sem_wait(&sem[0]);
 
         if(ret != 0){
@@ -235,18 +242,18 @@ redo1:
             exit(EXIT_FAILURE);
         }
 
-        /*ottengo i dati in input e li salvo nel buffer*/
+        /*prelevo i dati in input e li scrivo nel buffer*/
         scanf("%ms", &string);
         if(strlen(string) <= 5){
             strcpy(buff, string);
         }
-
         else{
             printf("You must insert string of max 5 char\n");
             exit(EXIT_FAILURE);
         }
 
 redo2:
+        /*segnalo al thread successivo che può operare*/
         ret = sem_post(&sem[turn+1]);
 
         if(ret != 0){
@@ -256,6 +263,7 @@ redo2:
             printf("Unable to signal Done semaphore of thread %d", turn);
             exit(EXIT_FAILURE);
         }
+
         /*implemento la logica di round-robin*/
         turn = (turn+1)%num_threads;
     }

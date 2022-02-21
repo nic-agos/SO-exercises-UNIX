@@ -35,7 +35,7 @@ figli.
 
 void **shared_memory;
 int num_processes;
-int sem;
+int ready;
 int fd;
 char *segment;
 int ret;
@@ -63,7 +63,7 @@ void thread_function(){
     oper.sem_num = 0;
 
     /*segnalo al processo main che ho terminato*/
-    if(semop(sem, &oper, 1) == -1){
+    if(semop(ready, &oper, 1) == -1){
         printf("Unable to signal semaphore\n");
         exit(EXIT_FAILURE);
     }
@@ -127,16 +127,16 @@ void main(int argc, char **argv)
     }
 
     /*creo il semaforo che conterà quanti processi figli hanno eseguito la scrittura sulla propria zona di memoria*/
-    sem = semget(IPC_PRIVATE, 1 , 0660);
+    ready = semget(IPC_PRIVATE, 1 , 0660);
 
-    if (sem == -1)
+    if (ready == -1)
     {
         printf("Unable to create semaphore\n");
         exit(EXIT_FAILURE);
     }
 
     /*inizializzo il semaforo con 0 token*/
-    if (semctl(sem, 0, SETVAL, 0) == -1)
+    if (semctl(ready, 0, SETVAL, 0) == -1)
     {
         printf("Unable to initialize semaphore\n");
         exit(EXIT_FAILURE);
@@ -190,7 +190,7 @@ void main(int argc, char **argv)
     oper.sem_flg = 0;
 
 redo:
-    if(semop(sem, &oper,1) == -1){
+    if(semop(ready, &oper,1) == -1){
         if(errno == EINTR){
             goto redo;
         }

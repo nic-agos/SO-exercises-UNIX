@@ -41,7 +41,7 @@ non piu' del 5% della capacita' di lavoro della CPU.
 #define MAX_LENGHT 4096
 
 FILE *output_file;
-int sem, done;
+int ready, done;
 char **shared_memory;
 pid_t child;
 long num_threads;
@@ -63,6 +63,7 @@ void *child_thread(void *arg){
 oper1:
         oper.sem_op = -1;
 
+        /*controllo se il relativo thread parent mi ha sbloccato, cosa che accade se mi ha consegnato una stringa*/
         ret = semop(done, &oper,1);
 
         if (ret == -1 && errno != EINTR){
@@ -73,14 +74,16 @@ oper1:
 
         printf("I'm the child thread %d, reading the string %s", me, shared_memory[me]);
 
+        /*scrivo sul file di output la stringa ricevuta dal relativo thread parent*/
         fprintf(output_file, "%s\n", shared_memory[me]);
 
         /*forzo la scrittura della stringa sul file*/
         fflush(output_file);
 
 oper2:
+        /*segnalo di aver terminato la mia esecuzione*/
         oper.sem_op = 1;
-        ret = semop(sem, &oper, 1);
+        ret = semop(ready, &oper, 1);
 
         if (ret == -1 && errno != EINTR){
 			printf("Unable to lock Done semaphore in child thread %d", me);
@@ -111,7 +114,7 @@ void *parent_thread(void *arg){
 oper1:
         /*tento di ottenere il lock sul semaforo ready per capire 
           se posso leggere una nuova string da stdint*/
-        ret = semop(sem, &oper, 1);
+        ret = semop(ready, &oper, 1);
 
         if (ret == -1 && errno != EINTR){
 			printf("Unable to lock Ready semaphore in parent thread %d", me);
@@ -120,6 +123,7 @@ oper1:
 		if (ret == -1) goto oper1;
 
 oper2:
+        /*inserisco la stringa prelevata da stdin nella i-esima entry del buffer condiviso*/
         ret = scanf("%s", shared_memory[me]);
         if(ret == EOF && errno != EINTR){
             printf("Unable to read from the terminal\n");
@@ -131,7 +135,8 @@ oper2:
 
         oper.sem_op = 1;
 
-oper3:
+oper3:  
+        /*segnalo al relativo thread figlio che ho consegnato dei dati per lui*/
         ret = semop(done, &oper, 1);
         if(ret == -1 && errno != EINTR){
             printf("Unable to unlock Done semaphore in parent thread %d\n", me);
@@ -168,7 +173,7 @@ int main(int argc, char **argv){
 
 
     if(argc != 3){
-        printf("Usage: filename NumThreads\n");
+        printf("Usage: prog filename NumThreads\n");
         exit(EXIT_FAILURE);
     }
 
@@ -183,7 +188,7 @@ int main(int argc, char **argv){
     file_name = argv[1];
 
     /*invoco la creazione del file di output, se non esiste già verrà 
-      creto mentre se già esistente viene troncato*/
+      creato mentre se già esistente viene troncato*/
     output_file = fopen(argv[1], "w+");
 
     if(output_file == NULL){
@@ -199,9 +204,11 @@ int main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
-    /*eseguo il mapping della zona di memoria condivisa*/
+    /*eseguo il mapping di ogni entry della zona di memoria condivisa*/
     for(i = 0; i<num_threads; i++){
+
         shared_memory[i] = (char*)mmap(NULL, MAX_LENGHT, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS , 0, 0);
+        
         if(shared_memory[i] == NULL){
             printf("Unable to map memory\n");
             exit(EXIT_FAILURE);
@@ -209,15 +216,15 @@ int main(int argc, char **argv){
     }
 
     /*istanzio l'array semaforico Ready */
-    sem = semget(IPC_PRIVATE, num_threads, IPC_CREAT | 0666);
-    if(sem == -1){
+    ready = semget(IPC_PRIVATE, num_threads, IPC_CREAT | 0666);
+    if(ready == -1){
         printf("Unable to initialize ready semaphores\n");
         exit(EXIT_FAILURE);
     }   
 
-    /*inizializzo i semafori Ready a 1*/
+    /*inizializzo tutti i semafori Ready a 1*/
     for(i = 0; i < num_threads; i++){
-        ret = semctl(sem, i, SETVAL, 1);
+        ret = semctl(ready, i, SETVAL, 1);
         if(ret == -1){
             printf("Unable to set Ready semaphores\n");
         }
@@ -248,7 +255,8 @@ int main(int argc, char **argv){
     }
     
     if(child == 0){
-
+        /*sono nel processo figlio*/
+        
         /*imposto la gestione del segnale SIGINT per il child process*/
         signal(SIGINT, child_handler);
 
@@ -261,6 +269,8 @@ int main(int argc, char **argv){
 
     }
     else{
+        /*sono nel processo padre*/
+
         /*imposto la gestione del segnale SIGINT per il main process*/
         signal(SIGINT, parent_handler);
 

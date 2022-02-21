@@ -1,7 +1,6 @@
 /*
 Implementare una programma che riceva in input, tramite argv[], il nome
-di un file F ed N stringhe S_1 .. S_N (con N maggiore o uguale
-ad 1.
+di un file F ed N stringhe S_1 .. S_N (con N maggiore o uguale ad 1).
 Per ogni stringa S_i dovra' essere attivato un nuovo thread T_i, che fungera'
 da gestore della stringa S_i.
 Il main thread dovra' leggere indefinitamente stringhe dallo standard-input. 
@@ -53,7 +52,7 @@ sem_t *read_sem;
 void printer(){
 
     char cmd[4096];
-    printf("\n");
+    printf("\nReceived CTRL+C - file content is:\n");
     sprintf(cmd, "cat %s", file_name);
     system(cmd);
     int ret;
@@ -110,6 +109,7 @@ int main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
+    /*copio in strings tutte le stringhe presenti in argv escluse le prime due (nome dell'eseguibile e nome del file)*/
     strings = argv + 2;
 
     file_name = argv[1];
@@ -168,7 +168,6 @@ int main(int argc, char **argv){
         }
     }
     
-
     /*inizializzo il buffer con il carattere vuoto*/
     strcpy(buff, "\0");
 
@@ -196,8 +195,8 @@ redo1:
     
         }
         
-        /*controllo se nel buffer è presente un qualcosa diverso dal carattere vuoto, se si vuol dire che 
-          gli N thread hanno eseguito una coputazione quindi devo srivere su file*/
+        /*controllo continuamente se nel buffer è presente un qualcosa diverso dal carattere vuoto, se si vuol dire che 
+          uno dei thread ha eseguito una computazione quindi devo scrivere sul file di output */
         if(strcmp(buff, "\0") !=0){
             fprintf(output_file, "%s\n", buff);
             fflush(output_file);

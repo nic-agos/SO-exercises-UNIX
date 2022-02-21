@@ -30,7 +30,7 @@ immesse da standard-input e memorizzate nei file destinazione.
 
 int num_processes;
 char **files_name;
-int sem;
+int ready;
 int done;
 char buff[128];
 
@@ -55,6 +55,7 @@ void *thread_function(void *arg){
 
     while(1){
 redo1:  
+        /*attendo che il processo padre abbia consegnato dei dati per inizare l'elaborazione*/
         op.sem_op = -1;
         if(semop(done, &op, 1) == -1){
             if(errno == EINTR){
@@ -66,13 +67,15 @@ redo1:
 
         printf("I'm the child thread %d, reading the string %s from buff\n", me, buff);
 
+        /*scrivo i dati ottenuti dal buffer condiviso sul relativo file che ho in gestione*/
         fprintf(output_file, "%s\n", buff);
 
+        /*forzo la scrittura dei dati sul file di output*/
         fflush(output_file);
 
 redo2:  
         op.sem_op = 1;
-        if(semop(sem, &op, 1) == -1){
+        if(semop(ready, &op, 1) == -1){
             if(errno == EINTR){
                 goto redo2;
             }
@@ -101,7 +104,7 @@ void main(int argc, char **argv){
     struct sembuf op;
 
     if(argc < 2){
-        printf("usage: prog pathname [pathname] ... [pathname]\n");
+        printf("usage: prog pathname1 [pathname2] ... [pathnameN]\n");
         exit(EXIT_FAILURE);
     }
 
@@ -113,16 +116,16 @@ void main(int argc, char **argv){
     signal(SIGINT, handler);
 
     /*alloco l'array semaforico Ready*/
-    sem = semget(IPC_PRIVATE, num_processes, IPC_CREAT | 0666);
+    ready = semget(IPC_PRIVATE, num_processes, IPC_CREAT | 0666);
 
-    if(sem == -1){
+    if(ready == -1){
         printf("Unable to initialize Ready semaphore\n");
         exit(EXIT_FAILURE);
     }
 
     /*inizializzo a 1 tutti i semafori Ready*/
     for(i = 0; i < num_processes; i++){
-        if(semctl(sem, i, SETVAL, 1) == -1){
+        if(semctl(ready, i, SETVAL, 1) == -1){
             printf("Unable to initialize Ready semaphores\n");
             exit(EXIT_FAILURE);
         }
@@ -144,6 +147,7 @@ void main(int argc, char **argv){
         }
     }
 
+    /*genero gli N thread*/
     for(i = 0; i < num_processes; i++){
         if(pthread_create(&tid, NULL, thread_function, (void *)i) != 0){
             printf("Unable to spawn threads\n");
@@ -151,16 +155,16 @@ void main(int argc, char **argv){
         }
     }
 
-    op.sem_flg = 0;
-
     while(1){
 
+         /*attendo che tutti i threads siano ready*/
         for(i=0; i<num_processes; i++){
             op.sem_op = -1;
+            op.sem_flg = 0;
 redo1:      
-            /*attendo che tutti i threads siano ready*/
+
             op.sem_num = i;
-            if(semop(sem, &op, 1) == -1){
+            if(semop(ready, &op, 1) == -1){
                 if(errno == EINTR){
                     goto redo1;
                 }
@@ -168,7 +172,9 @@ redo1:
                 exit(EXIT_FAILURE);
             }
         }
+
 read_again:
+
         if(scanf("%s", buff) == EOF){
             if(errno == EINTR){
                 goto read_again;
@@ -176,10 +182,13 @@ read_again:
             printf("Unable to get string from terminal\n");
             exit(EXIT_FAILURE);
         }
+
+        /*segnalo a tutti i thread che possono eseguire le loro operazioni*/
         for (i = 0; i<num_processes; i++){
             op.sem_op = 1;
             op.sem_num = i;
 redo2:
+
             if(semop(done, &op, 1) == -1){
                 if(errno == EINTR){
                     goto redo2;
