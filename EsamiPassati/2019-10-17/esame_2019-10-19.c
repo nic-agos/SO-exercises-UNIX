@@ -48,7 +48,7 @@ void *thread_function(void *arg){
     sigset_t set;
     FILE *target_file;
 
-    printf("thread n. %d started up _ in charge of file %s\n", me, files[me]);
+    printf("thread n. %d started up - in charge of file %s\n", me, files[me]);
     fflush(stdout);
 
     /* w+ : Open for reading and writing. The file is created if it does not exist, otherwise it is truncated.  
@@ -116,7 +116,7 @@ void printer(int dummy){
     while(1){
         ret = fscanf(source_files[i], "%ms", &s);
         if(ret == EOF){
-            /*sono arrivato alla fine del file */
+            /*sono arrivato alla fine del file i-esimo*/
             break;
         }
         /*stampo su terminale la stringa letta*/
@@ -147,11 +147,12 @@ int main(int argc, char **argv){
     char *s;
 
     if(argc < 2){
-        printf("Incorrect number of arguents\n");
+        printf("usage: prog filename1, [filename2], ... , [filenameN]\n");
         exit(EXIT_FAILURE);
     }
 
-    files = argv + 1; /*per evitare in inserire argv[0] (nome dell'eseguibile) nell'array di stringhe */ 
+    /*copio tutte le stringhe argv eccetto la prima (nome dell'eseguibile) in una variabile*/
+    files = argv + 1; 
 
     num_processes = argc - 1;
 
@@ -180,7 +181,7 @@ int main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
 
-    /*Associo i mutex all'i-esimo slot di ready e done ed eseguo il lock di tutty i mutex Ready*/
+    /*Associo il mutex i all'i-esimo slot di ready e done ed eseguo il lock di tutty i mutex Ready*/
     for (i = 0; i < num_processes; i++){
         if(pthread_mutex_init(ready+i, NULL) != 0){
             printf("Ready mutex initialization failure\n");
@@ -196,7 +197,7 @@ int main(int argc, char **argv){
         }
     }
 
-    /*genero N thread*/
+    /*genero gli N thread*/
     for (i = 0; i < num_processes; i++){
         ret = pthread_create(&tid, NULL, thread_function, (void *)i);
         if(ret != 0){

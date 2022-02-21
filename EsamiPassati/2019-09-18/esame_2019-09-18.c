@@ -60,6 +60,8 @@ void *thread_function(void *arg){
 
     /*controllo quale thread sono in base all'indice*/
     if(me < num_processes -1){
+
+        /*sono uno degli N thread*/
         printf("Thread %d started up - in charge of string: %s\n", me, strings[me]);
     }
     else{
@@ -70,8 +72,8 @@ void *thread_function(void *arg){
     /*inserisco tutti i segnali all'interno della maschera*/
     sigfillset(&set);
 
-    /*blocco tutti i segnali durante l'eseuczione delle operazioni del thread,
-      senza voler ottenre la vecchia maschera dei segnali per il thread*/
+    /*blocco tutti i segnali durante l'esecuzione delle operazioni del thread,
+      senza voler ottenere la vecchia maschera dei segnali per il thread*/
     sigprocmask(SIG_BLOCK, &set, NULL);
     
     while(1){
@@ -143,14 +145,14 @@ int main(int argc, char **argv){
     char *string;
 
     if(argc <2){
-        printf("Incorrect number of parameter\n");
+        printf("usage: prog string1, [string2], ..., [stringN]\n");
         exit(EXIT_FAILURE);
     }
 
     /*num_threads include nel conto anche il thread di output, quindi in totale N+1 threads*/
     num_processes = argc;
 
-    /*copio in strings i parametri passati al main eccetto il primo (nome del programma*/
+    /*copio in strings i parametri passati al main eccetto il primo (nome dell'eseguibile)*/
     strings = argv + 1;
 
     /*apro uno stream verso il file di output, 
@@ -167,7 +169,7 @@ int main(int argc, char **argv){
     done = malloc(sizeof(pthread_mutex_t)*num_processes);
 
     if(ready == NULL || done == NULL){
-        printf("unable to allocate mutex array\n");
+        printf("Unable to allocate mutex array\n");
         exit(EXIT_FAILURE);
     }
 
@@ -211,6 +213,7 @@ int main(int argc, char **argv){
         }
     }
 
+    /*imposto la funzione di gestione del segnale SIGINT per il thread main*/
     signal(SIGINT, printer);
 
     while(1){
@@ -234,11 +237,13 @@ redo1:
             printf("Main thread - error locking Done mutex for first thread\n");
             exit(EXIT_FAILURE);
         }
+    
+        /*la nuova stringa viene resa disponibile per il primo thread che poi a cascata la trasmetterà a tutti quelli dopo*/
         buffers[0] = string;
 
 redo2: 
         /*provo ad eseguire l'unlock sul mutex Ready, quando riuscirò a prenderlo vuol dire che il thread è in 
-        stato di ready pronto per attendere la nuova stringa */
+        stato di ready pronto per attendere la nuova stringa, questo perchè sto utilizzando un meccanismo di pipelining*/
         if(pthread_mutex_unlock(ready)){
             if(errno == EINTR){
                 goto redo2;
@@ -246,7 +251,6 @@ redo2:
             printf("Main thread - error locking Ready mutex for first thread\n");
             exit(EXIT_FAILURE);
         }
-
 
     }
     
