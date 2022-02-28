@@ -75,7 +75,7 @@ void *thread_function(void *arg){
 
         printf("thread n. %d got string %s\n", me, buffers[me]);
 
-        /*scrivo sul file la nuova riga ahce ho ricevuto dal main thread*/
+        /*scrivo sul file la nuova riga che ho ricevuto dal main thread*/
         fprintf(target_file, "%s\n", buffers[me]);
 
         /*forzo la scrittura dei dati sul file*/
@@ -97,6 +97,7 @@ void printer(int dummy){
     char *s;
     int ret;
 
+    /*apro in lettura tutti i file in gestione ai thread*/
     for(i = 0; i<num_processes; i++){
         source_files[i] = fopen(files[i], "r+");
         if(source_files[i] == NULL){
@@ -105,6 +106,7 @@ void printer(int dummy){
         }
     }
 
+    /*apro il lettura e scrittura il file di output, se non esiste verrà creato mentre se esiste già viene troncato*/
     output_file = fopen("output-file", "w+");
     if(output_file == NULL){
         printf("Unable to open file %s\n", output_file);
@@ -115,10 +117,12 @@ void printer(int dummy){
 
     while(1){
         ret = fscanf(source_files[i], "%ms", &s);
+
         if(ret == EOF){
             /*sono arrivato alla fine del file i-esimo*/
             break;
         }
+        
         /*stampo su terminale la stringa letta*/
         printf("%s", s);
 
@@ -215,17 +219,20 @@ int main(int argc, char **argv){
 
 read_again:
         ret = scanf("%ms", &s);
+
         /*se abbiamo un errore nella scanf questa ritorna EOF ed imposta errno con una macro che indica il tipo di errore,
           errno = EINTR quando l'eecuzione viene interrota dall'arrivo di un segnale*/
         if(ret == EOF && errno == EINTR){
+
             /*se vengo bloccato da un segnale devo rieseguire la scanf, l'unico segnale gestitio esplicitamente è SIGINT*/
             goto read_again;
         }
+
         printf("Read string (area is at address %p): %s\n", s, s);
 
 redo_1: 
         /* provo ad eseguire il lock sul mutex i-esimo Done, quando riuscirò a prenderlo vuol dire che 
-           l'i-esimo thread ha terinato la sua precedente esecuzione */
+           l'i-esimo thread ha terminato la sua precedente esecuzione */
         if(pthread_mutex_lock(done+i)){
             if(errno == EINTR){
                 goto redo_1;

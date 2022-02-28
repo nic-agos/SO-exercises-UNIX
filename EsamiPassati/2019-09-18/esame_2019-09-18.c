@@ -67,6 +67,7 @@ void *thread_function(void *arg){
     else{
         printf("Thread %d started up - in charge of the output file\n", me);
     }
+
     fflush(stdout);
 
     /*inserisco tutti i segnali all'interno della maschera*/
@@ -78,7 +79,7 @@ void *thread_function(void *arg){
     
     while(1){
 
-        /*tento di otteere il lock sul semaforo Ready dell'i-esimo thread, 
+        /*tento di ottenere il lock sul semaforo Ready dell'i-esimo thread, 
           se ci riesco vuol dire che questo è pronto per eseguire*/
         if(pthread_mutex_lock(ready+me)){
             printf("Unable to lock Ready mutex of thread %d\n", me);
@@ -228,7 +229,7 @@ read_again:
         printf("Input string (memory address %p) is : %s\n", string, string);
 
 redo1:
-        /*provo a prendere il lock sul mutex Done associato al primo thread, se ci riesco vuol dire che ha 
+        /*provo a prendere il lock sul primo mutex Done associato al primo thread, se ci riesco vuol dire che ha 
         terminato la sua precedente esecuzione e può ricevere la nuova stringa da elaborare */
         if(pthread_mutex_lock(done)){
             if(errno == EINTR){
@@ -242,7 +243,7 @@ redo1:
         buffers[0] = string;
 
 redo2: 
-        /*provo ad eseguire l'unlock sul mutex Ready, quando riuscirò a prenderlo vuol dire che il thread è in 
+        /*provo ad eseguire l'unlock sul primo mutex Ready, quando riuscirò a prenderlo vuol dire che il thread è in 
         stato di ready pronto per attendere la nuova stringa, questo perchè sto utilizzando un meccanismo di pipelining*/
         if(pthread_mutex_unlock(ready)){
             if(errno == EINTR){

@@ -73,11 +73,12 @@ step1:
         if(ret != 0 && errno == EINTR){
             goto step1;
         }
+
         /*controllo se la stringa in input dal terminale coincide con la stringa a me assegnata*/
         if(strcmp(buff, strings[me]) == 0){
             printf("Thread %d string match found\n", me);
 
-            /*sostituisco la stringa presente in buf con un solo asterisco per poi concatenare i restanti asterischi*/
+            /*sostituisco la stringa presente in buff con un solo asterisco per poi concatenare i restanti asterischi*/
             strcpy(buff, "*");
             for(i =0; i<(strlen(strings[me])-1); i++){
                 strcat(buff, "*");
@@ -162,13 +163,14 @@ int main(int argc, char **argv){
 
     /*creo gli N threads*/
     for(i=0; i< num_processes; i++){
+
         if(pthread_create(&pid, NULL, thread_function, (void *)i) != 0){
             printf("Unable to spawn threads\n");
             exit(EXIT_FAILURE);
         }
     }
     
-    /*inizializzo il buffer con il carattere vuoto*/
+    /*inizializzo il buffer con il carattere di teminazione*/
     strcpy(buff, "\0");
 
     /*aggiorno lo stream sul file in lettura/scrittura*/
@@ -195,7 +197,7 @@ redo1:
     
         }
         
-        /*controllo continuamente se nel buffer è presente un qualcosa diverso dal carattere vuoto, se si vuol dire che 
+        /*controllo se nel buffer è presente un qualcosa diverso dal carattere vuoto, se si vuol dire che 
           uno dei thread ha eseguito una computazione quindi devo scrivere sul file di output */
         if(strcmp(buff, "\0") !=0){
             fprintf(output_file, "%s\n", buff);
@@ -205,7 +207,7 @@ redo1:
         /*rendo disponibile la stringa presa in input a tutti i thread*/
         while(scanf("%s", buff) <= 0);
 
-        /*segnalo a tutti i thred la possibilità di lavorare*/
+        /*segnalo a tutti i thread la possibilità di lavorare*/
         for(i = 0; i < num_processes; i++){
 redo2:
             if(sem_post(&write_sem[i]) != 0){
